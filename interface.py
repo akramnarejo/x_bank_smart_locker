@@ -80,21 +80,38 @@ def recognize_iris(img):
 def save_manager():
     global manager_iris_image1
     global manager_iris_image2
+    existing_irises = []
+    if os.path.isfile('./db.pkl'):
+        data = db.read()
+        for mkey in data.keys():
+            for iris in data[mkey]['iris']:
+                existing_irises.append(iris)
+    
     if manager_name_entry.get() == '' or manager_cnic_entry.get() == '' or manager_iris_image1 == '':
         messagebox.showerror('Error','Please provide the required data to register.')
     else:
-        if messagebox.showinfo('Info', 'Your account has been created! \n Please Log In.'):
-            db.write(manager_name_entry.get(),manager_cnic_entry.get(),recognize_iris(manager_iris_image1),recognize_iris(manager_iris_image2))
+        yes = False
+        for i in [manager_iris_image1, manager_iris_image2]:
+            check, img = iris_obj.match_iris(recognize_iris(i), existing_irises)
+            if check:
+                yes = True
+                break
+        if yes:
+            messagebox.showerror('Error', 'This user already exists.')
+        else:
+            if messagebox.showinfo('Info', 'Your account has been created! \n Please Log In.'):
+                db.write(manager_name_entry.get(),manager_cnic_entry.get(),recognize_iris(manager_iris_image1),recognize_iris(manager_iris_image2))
+                raise_frame(home)
             # manager_name.configure(text='Bank Manager ('+manager_name_entry.get()+') is signedIn')
             # manager_name2.configure(text='Bank Manager ('+manager_name_entry.get()+') is signedIn')
             # manager_name3.configure(text='Bank Manager ('+manager_name_entry.get()+') is signedIn')
-            manager_name_entry.delete(0, END)
-            manager_cnic_entry.delete(0, END)
-            manager_iris_image1 = ''
-            manager_iris_image2 = ''
-            manager_iris1_label.configure(text='')
-            manager_iris2_label.configure(text='')
-            raise_frame(home)
+        manager_name_entry.delete(0, END)
+        manager_cnic_entry.delete(0, END)
+        manager_iris_image1 = ''
+        manager_iris_image2 = ''
+        manager_iris1_label.configure(text='')
+        manager_iris2_label.configure(text='')
+        
 
 login_manager_iris = ''
 imglbl = ''
@@ -158,23 +175,41 @@ def save_customer():
         locker += 1
         data = db.read()
         irises = []
+        existing_irises = []
+        # getting existing irises
+        for mkey in data.keys():
+            if data[mkey]['customers'].keys():
+                for ckey in data[mkey]['customers'].keys():
+                    for iris in data[mkey]['customers'][ckey]['iris']:
+                        existing_irises.append(iris)
+            else:
+                break
+        # checking if new iris already exists
+        iris_exists = False
         for i in [customer_iris_image1,customer_iris_image2]:
             if i != '':
-                irises.append(recognize_iris(i).ravel())
-        username = customer_name_entry.get()
-        username = username.replace(" ","")
-        for mkey in data.keys():       
-            if username not in data[mkey]['customers'].keys():
-                data[mkey]['customers'][username] = {
-                    'name':customer_name_entry.get(),
-                    'cnic':customer_cnic_entry.get(),
-                    'locker':locker,
-                    'iris':irises
-                }
-        if messagebox.showinfo('Info', 'Your account has been created! \n Please Log In.'):
-            with open('./db.pkl','wb') as book:
-                pickle.dump(data, book)
-            raise_frame(manager_page)
+                check,img = iris_obj.match_iris(recognize_iris(i), existing_irises)
+                if check:
+                    iris_exists = True
+                else:
+                    irises.append(recognize_iris(i).ravel()) 
+        if iris_exists:
+            messagebox.showerror("Error", "This user already exists.")
+        else:
+            username = customer_name_entry.get()
+            username = username.replace(" ","")
+            for mkey in data.keys():       
+                if username not in data[mkey]['customers'].keys():
+                    data[mkey]['customers'][username] = {
+                        'name':customer_name_entry.get(),
+                        'cnic':customer_cnic_entry.get(),
+                        'locker':locker,
+                        'iris':irises
+                    }
+            if messagebox.showinfo('Info', 'Your account has been created! \n Please Log In.'):
+                with open('./db.pkl','wb') as book:
+                    pickle.dump(data, book)
+                raise_frame(manager_page)
         
         customer_name_entry.delete(0, END)
         customer_cnic_entry.delete(0, END)
